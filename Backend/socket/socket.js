@@ -119,16 +119,14 @@ const initializeSocket = (io) => {
                 } 
                 else if (eventType === "delete") {
                     // Delete media from Cloudinary
-                    if (message.mediaUrl) {
-                        try {
-                            const publicId = message.mediaMetadata?.publicId;
-                            const resourceType = message.mediaUrl.includes("/raw/") ? "raw" : "image";
-                            console.log(`[Delete] Deleting from Cloudinary — publicId: "${publicId}", resourceType: "${resourceType}", url: "${message.mediaUrl}"`);
-                            await cloudinary.uploader.destroy(publicId, { resource_type: resourceType, invalidate: true });
-                        }
-                        catch (cloudErr) {
-                            console.error("Cloudinary delete error:", cloudErr.message);
-                        }
+                    try {
+                        const publicId = message.mediaMetadata.publicId;
+                        const resourceType = message.mediaMetadata.mediaUrl.includes("/raw/") ? "raw" : "image";
+                        // console.log(`[Delete] Deleting from Cloudinary — publicId: "${publicId}", resourceType: "${resourceType}", url: "${message.mediaMetadata.mediaUrl}"`);
+                        await cloudinary.uploader.destroy(publicId, { resource_type: resourceType, invalidate: true });
+                    }
+                    catch (cloudErr) {
+                        console.error("Cloudinary delete error:", cloudErr.message);
                     }
                     message.deletedAt = new Date();
                     message.content = "This message was deleted";

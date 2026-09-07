@@ -71,6 +71,7 @@ const MessageInput = ({ onSendMessage }) => {
             }
 
             const uploadData = uploadResponse.data;
+            // console.log("Upload successful:", uploadData);
 
             onSendMessage({
                 type: messageType,
@@ -81,6 +82,8 @@ const MessageInput = ({ onSendMessage }) => {
                     mimeType: file.type,
                     width: uploadData.width,
                     height: uploadData.height,
+                    publicId: uploadData.public_id || null,
+                    mediaUrl: uploadData.secure_url || null,
                 },
                 content: text.trim() || "",
             });

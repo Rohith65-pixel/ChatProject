@@ -2,7 +2,9 @@ import { FaDownload, FaFilePdf, FaFileWord, FaFileExcel, FaFilePowerpoint, FaFil
 import { Button } from "react-bootstrap";
 
 const MediaPreview = ({ message }) => {
-    const { type, mediaUrl, mediaMetadata } = message;
+    const { type, mediaMetadata } = message;
+
+    const mediaUrl = mediaMetadata?.mediaUrl;
 
     if (!mediaUrl) return null;
 

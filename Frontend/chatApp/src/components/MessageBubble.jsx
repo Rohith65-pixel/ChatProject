@@ -93,7 +93,7 @@ const MessageBubble = ({ message, isOwn }) => {
                             ) : (
                                 <>
                                     {/* Media Preview for image, video, audio */}
-                                    {message.type !== "text" && message.mediaUrl && (
+                                    {message.type !== "text" &&  message.mediaMetadata?.mediaUrl && (
                                         <div className="mb-2">
                                             <MediaPreview message={message} />
                                         </div>
