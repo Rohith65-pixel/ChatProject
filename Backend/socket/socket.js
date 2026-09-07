@@ -1,3 +1,4 @@
+import User from "../models/userModel.js";
 import Conversation from "../models/conversationModel.js";
 import Message from "../models/messageModel.js";
 import cloudinary from "../utils/cloudinary.js";
@@ -118,19 +119,22 @@ const initializeSocket = (io) => {
                     message.status = await getStatus(conversation);
                 } 
                 else if (eventType === "delete") {
-                    // Delete media from Cloudinary
-                    try {
-                        const publicId = message.mediaMetadata.publicId;
-                        const resourceType = message.mediaMetadata.mediaUrl.includes("/raw/") ? "raw" : "image";
-                        // console.log(`[Delete] Deleting from Cloudinary — publicId: "${publicId}", resourceType: "${resourceType}", url: "${message.mediaMetadata.mediaUrl}"`);
-                        await cloudinary.uploader.destroy(publicId, { resource_type: resourceType, invalidate: true });
-                    }
-                    catch (cloudErr) {
-                        console.error("Cloudinary delete error:", cloudErr.message);
-                    }
                     message.deletedAt = new Date();
                     message.content = "This message was deleted";
                     message.status = await getStatus(conversation);
+
+                    // Defer Cloudinary delete to server (async, non-blocking)
+                    setTimeout(async () => {
+                        try {
+                            if (message.mediaMetadata?.publicId) {
+                                const publicId = message.mediaMetadata.publicId;
+                                const resourceType = message.mediaMetadata.mediaUrl?.includes("/raw/") ? "raw" : "image";
+                                await cloudinary.uploader.destroy(publicId, { resource_type: resourceType, invalidate: true });
+                            }
+                        } catch (cloudErr) {
+                            console.error("Cloudinary delete error (deferred):", cloudErr.message);
+                        }
+                    }, 100);
                 } 
                 else {
                     return socket.emit("message_error", { message: "Invalid eventType" });
@@ -184,8 +188,17 @@ const initializeSocket = (io) => {
             }
         });
 
-        socket.on("disconnect", () => {
+        socket.on("check_user_online", (data) => {
+            const { userId } = data;
+            const online = isUserOnline(userId);
+            socket.emit("user_online", { userId, online });
+        });
+
+        socket.on("disconnect", async () => {
             console.log(`User disconnected: ${socket.user.name}`);
+            try {
+                await User.findByIdAndUpdate(socket.user._id, { lastSeen: new Date() });
+            } catch (e) {}
         });
     });
 };

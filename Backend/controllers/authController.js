@@ -64,9 +64,11 @@ const logoutUser = asyncHandler(async (req, res) => {
 });
 
 const getUserinfo = asyncHandler(async (req, res) => {
+    const id = req.params.id;
+    const user = await User.findById(id).select('-password');
     res.status(200).json({
         message: 'Profile fetch successful',
-        details: req.user
+        details: user
     });
 });
 

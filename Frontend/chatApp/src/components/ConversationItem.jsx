@@ -39,6 +39,10 @@ const ConversationItem = ({conversation, selected, onClick}) => {
                                 "No messages yet"}
                         </small>
 
+                        <small className="text-muted opacity-75">
+                            {conversation.lastMessageAt ? new Date(conversation.lastMessageAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ""}
+                        </small>
+
                     </div>
                 </div>
 
