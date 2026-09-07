@@ -28,7 +28,6 @@ dist-ssr/
 
 # Docker
 .dockerignore
-docker-compose.yml
 
 # Build artifacts
 *.cache
