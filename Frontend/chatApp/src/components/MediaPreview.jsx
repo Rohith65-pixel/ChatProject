@@ -69,19 +69,6 @@ const MediaPreview = ({ message }) => {
         );
     }
 
-    // Video Preview
-    if (type === "video") {
-        return (
-            <div className="media-preview">
-                <video src={mediaUrl} controls style={{ maxWidth: "100%", maxHeight: "400px", borderRadius: "8px" }} />
-                <div className="mt-2">
-                    <Button variant="link" size="sm" onClick={handleDownload} className="text-light">
-                        <FaDownload className="me-1" /> Download
-                    </Button>
-                </div>
-            </div>
-        );
-    }
 
     // File/Document Preview
     if (type === "file") {

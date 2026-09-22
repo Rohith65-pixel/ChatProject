@@ -4,6 +4,7 @@ const ConversationItem = ({conversation, selected, onClick}) => {
 
     const other = conversation.other;
     const unreadCount = conversation.unreadCount || 0;
+    const isGroup = conversation.participants.length > 2;
 
     return (
         <ListGroup.Item
@@ -31,7 +32,7 @@ const ConversationItem = ({conversation, selected, onClick}) => {
                     <div className="overflow-hidden flex-grow-1">
 
                         <div className="fw-bold">
-                            {other?.name}
+                            {isGroup ? conversation.groupName : other?.name}
                         </div>
 
                         <small className="text-muted text-truncate d-block">

@@ -49,13 +49,20 @@ const ChatScreen = () => {
     const fetchConversations = async () => {
         try {
             const res = await api.get("/conversations");
-            const formatted = res.data.map((convo) => ({
-                _id: convo._id,
-                other: convo.participants.find((user) => user._id !== myInfo._id),
-                lastMessage: convo.lastMessage,
-                lastMessageAt: convo.lastMessageAt,
-                unreadCount: convo.unreadCount?.[myInfo._id] || 0,
-            }));
+            const formatted = res.data.map((convo) => {
+                const participants = convo.participants || [];
+                const other = participants.find((user) => user._id !== myInfo._id) || null;
+
+                return {
+                    _id: convo._id,
+                    participants,
+                    groupName: convo.groupName || null,
+                    other,
+                    lastMessage: convo.lastMessage,
+                    lastMessageAt: convo.lastMessageAt,
+                    unreadCount: convo.unreadCount?.[myInfo._id] || 0,
+                };
+            });
 
             const sorted = sortByRecent(formatted);
             setConversations(sorted);
@@ -138,12 +145,12 @@ const ChatScreen = () => {
                     unreadCount: 0,
                 });
             } else {
-                // Update sidebar with unread count
-                updateConversationInList(conversationId, {
+                // Update sidebar with unread count (server always includes it)
+                updateConversationInList(conversationId, () => ({
                     lastMessage: message,
                     lastMessageAt: message.createdAt,
                     unreadCount: isOwn ? 0 : unreadCount,
-                });
+                }));
             }
         };
 
@@ -151,14 +158,14 @@ const ChatScreen = () => {
         const handleMessagesRead = (data) => {
             const currentConvo = selectedConversationRef.current;
             if (currentConvo && data.conversationId === currentConvo._id) {
+                const ids = new Set((data.readMessageIds || []).map(String));
+                if (ids.size === 0) return;
                 setMessages((prev) =>
-                    prev.map((msg) => {
-                        const senderId = msg.senderId?._id ?? msg.senderId;
-                        const isOwn = senderId?.toString() === myInfo._id;
-                        return isOwn && msg.status !== "read"
+                    prev.map((msg) =>
+                        ids.has(msg._id.toString()) && msg.status !== "read"
                             ? { ...msg, status: "read" }
-                            : msg;
-                    })
+                            : msg
+                    )
                 );
             }
         };
@@ -224,9 +231,28 @@ const ChatScreen = () => {
             console.error("Failed to load messages:", err.response?.data || err.message);
         }
     };
+    
+    const handleCreateConversation = async (newConversation) => {
+        const list = await fetchConversations();
+        const created = list.find((c) => c._id === newConversation._id);
+
+        if (created) {
+            handleSelectConversation(created);
+        }
+        toast.success("New conversation added!!!");
+    };
 
     const handleSendMessage = (messageData) => {
         if (!selectedConversation) return;
+
+        // Check for @ai prefix to trigger AI assistant
+        const isAITrigger = messageData.content?.trim().startsWith("@ai");
+        if (isAITrigger) {
+            socket.emit("ai_event", {
+                conversationId: selectedConversation._id,
+                message: messageData.content || "Please assist with this conversation.",
+            });
+        }
 
         // messageData can be { content, type: "text" } or { type, mediaUrl, mediaMetadata, content }
         socket.emit("new_message", {
@@ -237,16 +263,6 @@ const ChatScreen = () => {
             mediaUrl: messageData.mediaUrl || null,
             mediaMetadata: messageData.mediaMetadata || null,
         });
-    };
-
-    const handleCreateConversation = async (newConversation) => {
-        const list = await fetchConversations();
-        const created = list.find((c) => c._id === newConversation._id);
-
-        if (created) {
-            handleSelectConversation(created);
-        }
-        toast.success("New conversation added!!!");
     };
 
     const handleLogout = async () => {
@@ -304,7 +320,7 @@ const ChatScreen = () => {
                     {selectedConversation ? (
                         <>
                             <div className="flex-shrink-0">
-                                <ChatHeader user={selectedConversation.other} />
+                                <ChatHeader conversation={selectedConversation} user={selectedConversation.other} />
                             </div>
 
                             <div

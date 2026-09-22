@@ -12,7 +12,6 @@ const messageSchema = new mongoose.Schema(
     senderId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
     },
 
     content: {
@@ -36,6 +35,17 @@ const messageSchema = new mongoose.Schema(
       height: Number,
       mediaUrl: String,
       publicId: String,
+    },
+
+    readCount: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+      default: [],
+    },
+
+    replyTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Message",
+      default: null,
     },
 
     status: {

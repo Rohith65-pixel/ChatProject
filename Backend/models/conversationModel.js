@@ -10,6 +10,20 @@ const conversationSchema = new mongoose.Schema(
       },
     ],
 
+    // Set only when participants.length > 2 (group chat)
+    groupName: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+
+    groupAdmin: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+
     lastMessage: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Message",
@@ -33,17 +47,7 @@ const conversationSchema = new mongoose.Schema(
   }
 );
 
+conversationSchema.index({ participants: 1 });
+
 const Conversation = mongoose.model("Conversation", conversationSchema);
 export default Conversation;
-
-// {
-//   "_id": "65abc123",
-//   "participants": [
-//     "USER_A",
-//     "USER_B"
-//   ],
-//   "lastMessage": "65msg999",
-//   "lastMessageAt": "2026-08-28T14:30:00Z",
-//   "createdAt": "2026-08-28T12:00:00Z",
-//   "updatedAt": "2026-08-28T14:30:00Z"
-// }

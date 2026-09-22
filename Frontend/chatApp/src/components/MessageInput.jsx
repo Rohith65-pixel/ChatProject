@@ -21,6 +21,7 @@ const MessageInput = ({ onSendMessage }) => {
         e.preventDefault();
         if (!text.trim()) return;
 
+        // If text starts with @ai, send as regular message (ChatScreen handles AI trigger)
         onSendMessage({ content: text.trim(), type: "text" });
         setText("");
     };

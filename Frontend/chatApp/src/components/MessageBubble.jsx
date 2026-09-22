@@ -3,9 +3,12 @@ import { Button, Form } from "react-bootstrap";
 import { toast } from "react-toastify";
 import socket from "../socket/socket";
 import MediaPreview from "./MediaPreview";
+import { FaBrain } from "react-icons/fa";
 
 const MessageBubble = ({ message, isOwn }) => {
 
+    // Determine if message is from AI (senderId is null)
+    const isAI = message.senderId === null || message.senderId === undefined;
     const [editing, setEditing] = useState(false);
     const [content, setContent] = useState(message.content);
 
@@ -50,11 +53,14 @@ const MessageBubble = ({ message, isOwn }) => {
 
                 <div
                     className={`px-3 py-2 rounded ${
-                        isOwn ? "bg-own-dark" : "bg-other-dark"
+                        isOwn ? "bg-own-dark" : isAI ? "bg-ai-dark" : "bg-other-dark"
                     }`}
                     style={isOwn ? {
                         backgroundColor: "#1a3d1a",
                         color: "#f0f0f0"
+                    } : isAI ? {
+                        backgroundColor: "#3a5a7c",
+                        color: "#e0e0e0"
                     } : {
                         backgroundColor: "#2d2d2d",
                         color: "#e5e5e5"
@@ -137,9 +143,7 @@ const MessageBubble = ({ message, isOwn }) => {
 
                 {/* Edit/Delete */}
 
-                {isOwn &&
-                    !message.deletedAt &&
-                    !editing && (
+                {isOwn && !isAI && !message.deletedAt && !editing && (
 
                     <div className="mt-1">
                         {
