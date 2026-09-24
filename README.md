@@ -6,13 +6,17 @@ Chat app with a Node/Express + Socket.IO backend, React/Vite frontend, and Mongo
 
 This project uses a production setup where the **backend container builds the React frontend** and serves the built `dist` files via Express.
 
+### 1) Configure environment (Atlas)
+
 1) Copy env file:
 
 ```bash
 cp Backend/.env.example Backend/.env
 ```
 
-2) Start the stack:
+2) Update `Backend/.env` → set `MONGODB_URI` to your **MongoDB Atlas** connection string.
+
+### 2) Start the stack
 
 ```bash
 docker compose -f docker-compose.prod.yml up --build
@@ -20,17 +24,8 @@ docker compose -f docker-compose.prod.yml up --build
 
 - App (served by backend): http://localhost:8000
 
-3) Stop and remove containers (keeps the Mongo volume):
+### 3) Stop
 
 ```bash
 docker compose -f docker-compose.prod.yml down
-```
-
-## Environment Notes
-
-- Compose overrides `MONGODB_URI` so the backend talks to the `mongodb` service, not `127.0.0.1`.
-- Rebuild images after dependency changes:
-
-```bash
-docker compose -f docker-compose.prod.yml up --build
 ```
