@@ -1,7 +1,7 @@
 import User from "../models/userModel.js";
 import Conversation from "../models/conversationModel.js";
 import Message from "../models/messageModel.js";
-import cloudinary from "../utils/cloudinary.js";
+import { getPublicObjectUrl, deleteObjectFromS3 } from "../utils/s3.js";
 import { handleAIEvent } from "./aiSocket.js";
 
 const initializeSocket = (io) => {
@@ -87,7 +87,7 @@ const initializeSocket = (io) => {
                         conversationId: { $in: conversationIds },
                         senderId: { $ne: socket.user._id },
                         status: "sent",
-                    }, 
+                    },
                     { $set: { status: "delivered" } }
                 );
 
@@ -95,7 +95,7 @@ const initializeSocket = (io) => {
                 if (updateResult.modifiedCount > 0) {
                     conversations.forEach((conv) => {
                         const otherParticipants = getOtherParticipants(conv.participants);
-                        
+
                         otherParticipants.forEach((pid) => {
                             io.to(participantId(pid.toString())).emit("messages_delivered", {
                                 deliveredTo: socket.user._id,
@@ -105,7 +105,7 @@ const initializeSocket = (io) => {
                     });
                 }
             }
-        } 
+        }
         catch (err) {
             console.error("Error updating message status on connect:", err);
         }
@@ -113,16 +113,36 @@ const initializeSocket = (io) => {
         // NEW / EDIT / DELETE via unified new_message event
         socket.on("new_message", async (data) => {
             try {
-                const { eventType, messageId, content, conversationId: incomingConvId, type = "text", mediaUrl, mediaMetadata } = data;
+                const {
+                    eventType,
+                    messageId,
+                    content,
+                    conversationId: incomingConvId,
+                    type = "text",
+                    mediaUrl,
+                    mediaMetadata,
+                } = data;
+
                 const userId = socket.user._id;
 
                 // --- NEW ---
                 if (eventType === "new") {
-                    if (!incomingConvId || (!content?.trim() && !mediaUrl && !mediaMetadata?.mediaUrl)) {
+                    if (!incomingConvId || (!content?.trim() && !mediaUrl && !mediaMetadata?.mediaUrl && !mediaMetadata?.s3ObjectKey)) {
                         return socket.emit("message_error", { message: "Conversation ID and content or media required" });
                     }
+
                     const conversation = await Conversation.findOne({ _id: incomingConvId, participants: userId });
                     if (!conversation) return socket.emit("message_error", { message: "Conversation not found" });
+
+                    // If S3 object key exists, inject a public S3 URL so the client can render immediately
+                    let resolvedMediaMetadata = mediaMetadata || null;
+                    const s3ObjectKey = mediaMetadata?.s3ObjectKey;
+                    if (resolvedMediaMetadata && s3ObjectKey) {
+                        resolvedMediaMetadata = {
+                            ...resolvedMediaMetadata,
+                            mediaUrl: getPublicObjectUrl({ objectKey: s3ObjectKey }),
+                        };
+                    }
 
                     const status = getStatus(conversation, userId);
                     const message = await Message.create({
@@ -130,9 +150,10 @@ const initializeSocket = (io) => {
                         senderId: userId,
                         content: (content || "").trim(),
                         type: type || "text",
-                        mediaMetadata: mediaMetadata || null,
+                        mediaMetadata: resolvedMediaMetadata,
                         status,
                     });
+
                     await message.populate("senderId", "name email");
 
                     conversation.lastMessage = message._id;
@@ -155,33 +176,34 @@ const initializeSocket = (io) => {
                 const conversation = await Conversation.findById(message.conversationId);
                 if (!conversation) return socket.emit("message_error", { message: "Conversation not found" });
 
-                const publicId = message.mediaMetadata?.publicId;
-                const storedMediaUrl = message.mediaMetadata?.mediaUrl;
+                const s3ObjectKey = message.mediaMetadata?.s3ObjectKey;
 
                 if (eventType === "edit") {
                     if (!content?.trim()) return socket.emit("message_error", { message: "Content required for edit" });
                     message.content = content.trim();
                     message.editedAt = new Date();
                     message.status = getStatus(conversation, userId);
-                } else if (eventType === "delete") {
+                }
+                else if (eventType === "delete") {
                     message.deletedAt = new Date();
                     message.content = "This message was deleted";
                     message.status = getStatus(conversation, userId);
-                } else {
+                }
+                else {
                     return socket.emit("message_error", { message: "Invalid eventType" });
                 }
 
                 await message.save();
                 await message.populate("senderId", "name email");
 
-                // Only destroy Cloudinary assets after the DB write succeeds
-                if (eventType === "delete" && publicId) {
+                // Only delete S3 objects after the DB write succeeds
+                if (eventType === "delete" && s3ObjectKey) {
                     setImmediate(async () => {
                         try {
-                            const resourceType = storedMediaUrl?.includes("/raw/") ? "raw" : "image";
-                            await cloudinary.uploader.destroy(publicId, { resource_type: resourceType, invalidate: true });
-                        } catch (cloudErr) {
-                            console.error("Cloudinary delete error (deferred):", cloudErr.message);
+                            await deleteObjectFromS3({ objectKey: s3ObjectKey });
+                        }
+                        catch (s3Err) {
+                            console.error("S3 delete error (deferred):", s3Err.message);
                         }
                     });
                 }
@@ -198,7 +220,8 @@ const initializeSocket = (io) => {
                     broadcastToConv(conversation, eventType, message);
                 }
 
-            } catch (err) {
+            }
+            catch (err) {
                 console.error("New message error:", err);
                 socket.emit("message_error", { message: "Failed to process message" });
             }
@@ -277,7 +300,10 @@ const initializeSocket = (io) => {
             console.log(`User disconnected: ${socket.user.name}`);
             try {
                 await User.findByIdAndUpdate(socket.user._id, { lastSeen: new Date() });
-            } catch (e) {}
+            }
+            catch (e) { 
+                console.error("Error updating lastSeen on disconnect:", e);
+            }
         });
     });
 };

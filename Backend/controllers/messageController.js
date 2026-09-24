@@ -2,12 +2,15 @@ import asyncHandler from "express-async-handler";
 import Message from "../models/messageModel.js";
 import Conversation from "../models/conversationModel.js";
 
+import { getPublicObjectUrl } from "../utils/s3.js";
+
 
 export const createMessage = asyncHandler(async (req, res) => {
 
-    const { conversationId, content, type = "text", mediaUrl, mediaMetadata } = req.body;
+    const { conversationId, content, type = "text", mediaMetadata } = req.body;
 
-    if (!conversationId || (!content?.trim() && !mediaUrl)) {
+    const hasMedia = !!mediaMetadata?.s3ObjectKey || !!mediaMetadata?.mediaUrl;
+    if (!conversationId || (!content?.trim() && !hasMedia)) {
         res.status(400);
         throw new Error("Conversation ID and content or media are required");
     }
@@ -37,7 +40,6 @@ export const createMessage = asyncHandler(async (req, res) => {
         senderId: req.user._id,
         content: content?.trim() || "",
         type: type || "text",
-        mediaUrl: mediaUrl || null,
         mediaMetadata: mediaMetadata || null
     });
 
@@ -81,7 +83,19 @@ export const getMessages = asyncHandler(async (req, res) => {
         .sort({ createdAt: 1 })
         .limit(limit);
 
-    res.status(200).json(messages);
+    // Inject public S3 URLs for any S3-backed media so the UI can render
+    const enriched = messages.map((msg) => {
+        const s3ObjectKey = msg.mediaMetadata?.s3ObjectKey;
+        if (!s3ObjectKey) return msg;
+
+        msg.mediaMetadata = {
+            ...(msg.mediaMetadata || {}),
+            mediaUrl: getPublicObjectUrl({ objectKey: s3ObjectKey }),
+        };
+        return msg;
+    });
+
+    res.status(200).json(enriched);
 });
 
 

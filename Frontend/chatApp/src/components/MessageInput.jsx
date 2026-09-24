@@ -46,45 +46,36 @@ const MessageInput = ({ onSendMessage }) => {
 
             const signatureRes = await api.post("/media/upload-signature", {
                 resourceType,
+                fileName: file.name,
+                mimeType: file.type,
+                fileSize: file.size,
             });
 
-            const { signature, timestamp, cloudName, apiKey, folder, uploadUrl } =
-                signatureRes.data.data;
+            const { uploadUrl, objectKey, mimeType } = signatureRes.data.data;
 
-            if (!signature || !timestamp || !cloudName || !apiKey) {
-                throw new Error("Invalid signature data received from server");
+            if (!uploadUrl || !objectKey) {
+                throw new Error("Invalid upload URL data received from server");
             }
 
-            const formData = new FormData();
-            formData.append("file", file);
-            formData.append("signature", signature);
-            formData.append("timestamp", timestamp);
-            formData.append("api_key", apiKey);
-            formData.append("folder", folder);
+            const uploadResponse = await axios.put(uploadUrl, file, {
+                headers: {
+                    "Content-Type": mimeType || file.type,
+                },
+            });
 
-            const uploadResponse = await axios.post(uploadUrl, formData);
-
-            if (uploadResponse.status !== 200) {
-                throw new Error(
-                    uploadResponse.data?.error?.message ||
-                        `Upload failed with status ${uploadResponse.status}`
-                );
+            // For pre-signed PUT, success typically means 200.
+            if (uploadResponse.status < 200 || uploadResponse.status >= 300) {
+                throw new Error(`Upload failed with status ${uploadResponse.status}`);
             }
-
-            const uploadData = uploadResponse.data;
-            // console.log("Upload successful:", uploadData);
 
             onSendMessage({
                 type: messageType,
-                mediaUrl: uploadData.secure_url,
+                mediaUrl: null,
                 mediaMetadata: {
                     fileName: file.name,
                     fileSize: file.size,
                     mimeType: file.type,
-                    width: uploadData.width,
-                    height: uploadData.height,
-                    publicId: uploadData.public_id || null,
-                    mediaUrl: uploadData.secure_url || null,
+                    s3ObjectKey: objectKey,
                 },
                 content: text.trim() || "",
             });
@@ -127,14 +118,14 @@ const MessageInput = ({ onSendMessage }) => {
 
                     <Form.Control
                         type="text"
-                        placeholder={uploading ? "Uploading..." : "Type a message..."}
+                        placeholder={uploading ? "Uploading..." : "To use AI, start your message with @ai and start typing"}
                         value={text}
                         onChange={(e) => setText(e.target.value)}
                         disabled={uploading}
                         style={{
                             backgroundColor: "#1a1a1a",
                             borderColor: "#333333",
-                            color: "#e0e0e0"
+                            color: "#e0e0e0",
                         }}
                     />
                     <Button type="submit" variant="primary" disabled={uploading}>

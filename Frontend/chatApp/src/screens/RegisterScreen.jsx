@@ -30,15 +30,20 @@ const RegisterScreen = () => {
 
             setLoading(true);
 
-            await api.post("/auth/register", {
+            const res = await api.post("/auth/register", {
                 name,
                 email,
                 password,
                 bio
             });
 
-            toast.success("Account created successfully! Please log in.");
-            navigate("/login");
+            localStorage.setItem(
+                "user",
+                JSON.stringify(res.data.details)
+            );
+
+            toast.success("Account created successfully!");
+            navigate("/chat");
 
         } catch (err) {
 

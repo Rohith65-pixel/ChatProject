@@ -26,9 +26,6 @@ dist-ssr/
 *.sln
 *.sw?
 
-# Docker
-.dockerignore
-
 # Build artifacts
 *.cache
 *.tgz

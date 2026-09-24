@@ -1,8 +1,12 @@
+import { useState } from "react";
 import { FaDownload, FaFilePdf, FaFileWord, FaFileExcel, FaFilePowerpoint, FaFile } from "react-icons/fa";
 import { Button } from "react-bootstrap";
+import { toast } from "react-toastify";
+import api from "../api/axios";
 
 const MediaPreview = ({ message }) => {
     const { type, mediaMetadata } = message;
+    const [downloading, setDownloading] = useState(false);
 
     const mediaUrl = mediaMetadata?.mediaUrl;
 
@@ -18,23 +22,28 @@ const MediaPreview = ({ message }) => {
     };
 
     const handleDownload = async () => {
-        // Fetch as blob and trigger download via object URL — avoids cross-origin restriction
+        if (!message?._id || downloading) return;
+
+        setDownloading(true);
         try {
-        const response = await fetch(mediaUrl);
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = mediaMetadata?.fileName || "download";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        }
-        catch(err) {
-            console.error("Download failed:", err);
-            // Fallback: open in new tab if blob fetch fails (e.g. CORS)
-            window.open(mediaUrl, "_blank");
+            // Browsers ignore <a download> on cross-origin URLs, so the public
+            // S3 link just opens the file. A signed GET with
+            // Content-Disposition: attachment forces a real download.
+            const res = await api.get(`/media/download/${message._id}`);
+            const { downloadUrl, fileName } = res.data.data || {};
+            if (!downloadUrl) throw new Error("No download URL returned");
+
+            const link = document.createElement("a");
+            link.href = downloadUrl;
+            link.download = fileName || mediaMetadata?.fileName || "download";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } catch (err) {
+            console.error("Download error:", err);
+            toast.error(err.response?.data?.message || "Failed to download file");
+        } finally {
+            setDownloading(false);
         }
     };
 
@@ -55,9 +64,15 @@ const MediaPreview = ({ message }) => {
                     onClick={() => window.open(mediaUrl, "_blank")}
                 />
                 <div className="mt-2">
-                    <Button variant="link" size="sm" onClick={handleDownload} className="text-light">
+                    <Button
+                        variant="link"
+                        size="sm"
+                        onClick={handleDownload}
+                        disabled={downloading}
+                        className="text-light"
+                    >
                         <FaDownload className="me-1" />
-                        Download
+                        {downloading ? "Downloading..." : "Download"}
                     </Button>
                     {mediaMetadata?.fileName && (
                         <small className="text-light ms-2 opacity-75">
@@ -94,6 +109,8 @@ const MediaPreview = ({ message }) => {
                         variant="outline-primary"
                         size="sm"
                         onClick={handleDownload}
+                        disabled={downloading}
+                        title={downloading ? "Downloading..." : "Download"}
                     >
                         <FaDownload />
                     </Button>

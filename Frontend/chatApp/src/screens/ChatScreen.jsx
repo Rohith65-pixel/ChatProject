@@ -283,7 +283,7 @@ const ChatScreen = () => {
     return (
         <Container fluid className="vh-100 p-0 overflow-hidden d-flex flex-column">
             <div className="border-bottom px-3 py-2 d-flex justify-content-between align-items-center flex-shrink-0">
-                <h5 className="mb-0">ChatApp</h5>
+                <h5 className="mb-0">Welcome, {myInfo.name}!</h5>
                 <Button variant="outline-danger" size="sm" onClick={handleLogout}>
                     Logout
                 </Button>
